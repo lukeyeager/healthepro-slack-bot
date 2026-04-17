@@ -1,0 +1,6 @@
+org_id: 0      # Health-e Pro organization ID
+menu_id: 0     # Health-e Pro menu ID
+evening_cron: "0 19 * * 0-4"      # night-before preview (Sun–Thu)
+morning_cron: "0 6 * * 1-5"       # morning re-check (Mon–Fri)
+db_path: "/data/menus.db"          # inside container; bind-mount ./data/ from host
+timezone: "America/Chicago"        # cron timezone

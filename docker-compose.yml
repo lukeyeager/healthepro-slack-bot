@@ -1,0 +1,16 @@
+services:
+  bot:
+    build: .
+    restart: unless-stopped
+    environment:
+      - SLACK_WEBHOOK_URL
+    volumes:
+      - type: bind
+        source: ./data/
+        target: /data/
+      - type: bind
+        source: ./config.yaml
+        target: /app/config.yaml
+        read_only: true
+    ports:
+      - "9090:9090"

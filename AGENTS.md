@@ -1,0 +1,104 @@
+# Agent Guide
+
+## Project overview
+
+A Go bot that polls the Health-e Pro school menu API (`menus.healthepro.com`) on a cron
+schedule and posts the day's lunch menu to a Slack webhook. Deployed via docker-compose.
+
+## Key design decisions
+
+- **Fallback logic:** The API exposes `setting` (current) and `setting_original` (original) for
+  each day. When `setting.current_display` is empty (a known operator data-entry bug), the bot falls
+  back to `setting_original.current_display`. This is the core reliability improvement over the
+  "My School Menus" app.
+- **No auth:** The Health-e Pro API is fully public — no API keys needed.
+- **Two-phase posting:** The bot runs on two cron schedules:
+  - **Evening (default 7pm Sun–Thu):** fetches *tomorrow's* menu and always posts it to Slack as
+    a preview.
+  - **Morning (default 6am Mon–Fri):** fetches *today's* menu and posts only if it differs from
+    what was posted the night before. No message if unchanged.
+  State (the last-posted menu) is persisted to a local file between the two runs so the morning
+  check can compare. The state file path is configurable and should be on a docker volume.
+- **Config vs secrets:** Static IDs (org/site/menu) live in `config.yaml`; the Slack webhook URL
+  lives in `.env`. Neither is checked into git (both are in `.gitignore`).
+
+## Repo layout
+
+```
+.
+├── cmd/bot/         # main entrypoint
+├── internal/
+│   ├── healthepro/  # API client (fetches menu data)
+│   ├── slack/       # Slack webhook client
+│   ├── metrics/     # Prometheus instrumentation
+│   └── scheduler/   # cron runner
+├── config.yaml.example
+├── .env.example
+├── docker-compose.yml
+├── Dockerfile
+└── .github/workflows/ci.yml
+```
+
+## Database (SQLite via `modernc.org/sqlite`)
+
+One row per school day, stored in `./data/menus.db` (bind-mounted into the container).
+
+```sql
+CREATE TABLE menus (
+    date       TEXT PRIMARY KEY,       -- "2026-04-17"
+    fetched_at TEXT NOT NULL,          -- RFC3339 timestamp of most recent fetch/overwrite
+    source     TEXT NOT NULL,          -- "current" or "original" (which API field was used)
+    items      TEXT NOT NULL,          -- JSON array of current_display items
+    changed    INTEGER NOT NULL DEFAULT 0  -- 1 if morning check found menu different from evening post
+);
+```
+
+**Write behavior:**
+- **Evening run:** `INSERT OR REPLACE` with `changed = 0`.
+- **Morning run:** if items differ from the stored row, overwrite (`items`, `fetched_at`, `source`)
+  and set `changed = 1`. If unchanged, do nothing.
+
+## Config shape (`config.yaml`)
+
+```yaml
+org_id: 0     # Health-e Pro organization ID
+site_id: 0    # Health-e Pro site (school) ID
+menu_id: 0    # Health-e Pro menu ID
+evening_cron: "0 19 * * 0-4"  # night-before preview (Sun–Thu)
+morning_cron: "0 6 * * 1-5"   # morning re-check (Mon–Fri)
+db_path: "/data/menus.db"      # bind-mounted from ./data/ on the host
+```
+
+## Development commands
+
+```bash
+go test ./...        # run tests
+golangci-lint run    # lint
+docker-compose up    # run locally
+```
+
+## API shape
+
+Daily menu endpoint:
+```
+GET https://menus.healthepro.com/api/organizations/{org_id}/menus/{menu_id}/year/{YYYY}/month/{M}/date_overwrites
+```
+
+Each element of `data[]` has:
+- `day` — ISO date string (`"2026-04-17"`)
+- `setting` — JSON string; check `current_display[]` first
+- `setting_original` — JSON string; fall back to `current_display[]` if `setting` is empty
+- `setting.days_off` — array; if non-empty the school is closed (skip posting)
+
+Items in `current_display` have `type` of `"category"` or `"recipe"`.
+
+## Metrics (Prometheus, port 9090)
+
+- `healthepro_requests_total{status_code}`
+- `slack_requests_total{status_code}`
+
+## CI (GitHub Actions)
+
+On every push/PR: lint with `golangci-lint` and run `go test ./...`.
+Secrets (`SLACK_WEBHOOK_URL`) must never be committed — use `.env` locally and GitHub Actions
+secrets in CI.
