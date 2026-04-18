@@ -14,8 +14,7 @@ type Config struct {
 	FetchCron string `yaml:"fetch_cron"`
 	DBPath    string `yaml:"db_path"`
 	Timezone  string `yaml:"timezone"`
-	HTTPAddr  string `yaml:"http_addr"`
-	MetricsAddr string `yaml:"metrics_addr"`
+	HTTPAddr string `yaml:"http_addr"`
 }
 
 // Load reads and parses a YAML config file, applying defaults for optional fields.
@@ -29,8 +28,7 @@ func Load(path string) (*Config, error) {
 		FetchCron:   "0 * * * *",
 		DBPath:      "/data/menus.db",
 		Timezone:    "America/Chicago",
-		HTTPAddr:    ":8080",
-		MetricsAddr: ":9090",
+		HTTPAddr: ":8080",
 	}
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return nil, fmt.Errorf("parsing config file: %w", err)

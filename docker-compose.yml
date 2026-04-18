@@ -11,5 +11,4 @@ services:
         target: /app/config.yaml
         read_only: true
     ports:
-      - "8080:8080"   # menu web page
-      - "9090:9090"   # Prometheus metrics
+      - "8080:8080"

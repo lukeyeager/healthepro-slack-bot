@@ -3,5 +3,4 @@ menu_id: 0     # Health-e Pro menu ID
 fetch_cron: "0 * * * *"            # hourly fetch (default)
 db_path: "/data/menus.db"          # inside container; bind-mount ./data/ from host
 timezone: "America/Chicago"        # week boundary and display timezone
-http_addr: ":8080"                 # address for the menu web page
-metrics_addr: ":9090"              # address for Prometheus /metrics
+http_addr: ":8080"                 # serves / (menu page) and /metrics (Prometheus)

@@ -62,23 +62,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	webMux := http.NewServeMux()
-	webMux.Handle("/", web.New(db, loc))
-	webSrv := &http.Server{Addr: cfg.HTTPAddr, Handler: webMux}
+	mux := http.NewServeMux()
+	mux.Handle("/", web.New(db, loc))
+	mux.Handle("/metrics", promhttp.Handler())
+	srv := &http.Server{Addr: cfg.HTTPAddr, Handler: mux}
 	go func() {
-		slog.Info("web server listening", "addr", webSrv.Addr)
-		if err := webSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			slog.Error("web server error", "err", err)
-		}
-	}()
-
-	metricsMux := http.NewServeMux()
-	metricsMux.Handle("/metrics", promhttp.Handler())
-	metricsSrv := &http.Server{Addr: cfg.MetricsAddr, Handler: metricsMux}
-	go func() {
-		slog.Info("metrics server listening", "addr", metricsSrv.Addr)
-		if err := metricsSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			slog.Error("metrics server error", "err", err)
+		slog.Info("server listening", "addr", srv.Addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("server error", "err", err)
 		}
 	}()
 
@@ -90,6 +81,5 @@ func main() {
 	sched.Stop()
 	shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_ = webSrv.Shutdown(shutCtx)
-	_ = metricsSrv.Shutdown(shutCtx)
+	_ = srv.Shutdown(shutCtx)
 }
