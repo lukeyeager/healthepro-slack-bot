@@ -1,3 +1,7 @@
+networks:
+  monitoring_internal:
+    external: true
+
 services:
   bot:
     build: .
@@ -12,3 +16,5 @@ services:
         read_only: true
     ports:
       - "8080:8080"
+    networks:
+      - monitoring_internal
