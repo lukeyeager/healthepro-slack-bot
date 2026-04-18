@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -15,8 +16,8 @@ import (
 	"github.com/lukeyeager/school-lunch-schedule/internal/healthepro"
 	"github.com/lukeyeager/school-lunch-schedule/internal/metrics"
 	"github.com/lukeyeager/school-lunch-schedule/internal/scheduler"
-	"github.com/lukeyeager/school-lunch-schedule/internal/slack"
 	"github.com/lukeyeager/school-lunch-schedule/internal/store"
+	"github.com/lukeyeager/school-lunch-schedule/internal/web"
 )
 
 func main() {
@@ -30,9 +31,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	webhookURL := os.Getenv("SLACK_WEBHOOK_URL")
-	if webhookURL == "" {
-		slog.Error("SLACK_WEBHOOK_URL environment variable is not set")
+	loc, err := time.LoadLocation(cfg.Timezone)
+	if err != nil {
+		slog.Error("invalid timezone", "timezone", cfg.Timezone, "err", err)
 		os.Exit(1)
 	}
 
@@ -50,9 +51,8 @@ func main() {
 	}()
 
 	hepClient := healthepro.NewClient(cfg.OrgID, cfg.MenuID, m)
-	slackClient := slack.NewClient(webhookURL, m)
 
-	sched, err := scheduler.New(cfg, hepClient, slackClient, db)
+	sched, err := scheduler.New(cfg, hepClient, db, m)
 	if err != nil {
 		slog.Error("failed to create scheduler", "err", err)
 		os.Exit(1)
@@ -62,12 +62,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.Handler())
-	srv := &http.Server{Addr: ":9090", Handler: mux}
+	webMux := http.NewServeMux()
+	webMux.Handle("/", web.New(db, loc))
+	webSrv := &http.Server{Addr: cfg.HTTPAddr, Handler: webMux}
 	go func() {
-		slog.Info("metrics server listening", "addr", srv.Addr)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		slog.Info("web server listening", "addr", webSrv.Addr)
+		if err := webSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("web server error", "err", err)
+		}
+	}()
+
+	metricsMux := http.NewServeMux()
+	metricsMux.Handle("/metrics", promhttp.Handler())
+	metricsSrv := &http.Server{Addr: cfg.MetricsAddr, Handler: metricsMux}
+	go func() {
+		slog.Info("metrics server listening", "addr", metricsSrv.Addr)
+		if err := metricsSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("metrics server error", "err", err)
 		}
 	}()
@@ -78,7 +88,8 @@ func main() {
 
 	slog.Info("shutting down")
 	sched.Stop()
-	if err := srv.Shutdown(context.Background()); err != nil {
-		slog.Error("metrics server shutdown error", "err", err)
-	}
+	shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_ = webSrv.Shutdown(shutCtx)
+	_ = metricsSrv.Shutdown(shutCtx)
 }

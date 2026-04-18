@@ -15,8 +15,7 @@ CREATE TABLE IF NOT EXISTS menus (
     date       TEXT PRIMARY KEY,
     fetched_at TEXT NOT NULL,
     source     TEXT NOT NULL,
-    items      TEXT NOT NULL,
-    changed    INTEGER NOT NULL DEFAULT 0
+    items      TEXT NOT NULL
 )`
 
 // MenuRecord is a row from the menus table.
@@ -25,7 +24,6 @@ type MenuRecord struct {
 	FetchedAt time.Time
 	Source    string
 	Items     []healthepro.DisplayItem
-	Changed   bool
 }
 
 // Store wraps a SQLite database for menu persistence.
@@ -34,6 +32,8 @@ type Store struct {
 }
 
 // New opens (or creates) the SQLite database at path and applies the schema.
+// Existing databases with extra columns (e.g. the old `changed` column) are
+// left intact; the new code simply ignores those columns.
 func New(path string) (*Store, error) {
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
@@ -52,29 +52,22 @@ func (s *Store) Close() error {
 }
 
 // Upsert inserts or replaces the menu record for the given date.
-// On a morning re-check, changed should be true if the items differ from the evening post.
-func (s *Store) Upsert(date string, entry *healthepro.DayEntry, changed bool) error {
+func (s *Store) Upsert(date string, entry *healthepro.DayEntry) error {
 	items, err := json.Marshal(entry.Items)
 	if err != nil {
 		return fmt.Errorf("marshaling items: %w", err)
 	}
-	changedInt := 0
-	if changed {
-		changedInt = 1
-	}
 	_, err = s.db.Exec(`
-		INSERT INTO menus (date, fetched_at, source, items, changed)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO menus (date, fetched_at, source, items)
+		VALUES (?, ?, ?, ?)
 		ON CONFLICT(date) DO UPDATE SET
 			fetched_at = excluded.fetched_at,
 			source     = excluded.source,
-			items      = excluded.items,
-			changed    = excluded.changed`,
+			items      = excluded.items`,
 		date,
 		time.Now().UTC().Format(time.RFC3339),
 		entry.Source,
 		string(items),
-		changedInt,
 	)
 	return err
 }
@@ -82,13 +75,12 @@ func (s *Store) Upsert(date string, entry *healthepro.DayEntry, changed bool) er
 // Get retrieves the menu record for the given ISO date, or nil if not found.
 func (s *Store) Get(date string) (*MenuRecord, error) {
 	row := s.db.QueryRow(
-		`SELECT date, fetched_at, source, items, changed FROM menus WHERE date = ?`, date)
+		`SELECT date, fetched_at, source, items FROM menus WHERE date = ?`, date)
 
 	var r MenuRecord
 	var fetchedAt, itemsJSON string
-	var changed int
 
-	err := row.Scan(&r.Date, &fetchedAt, &r.Source, &itemsJSON, &changed)
+	err := row.Scan(&r.Date, &fetchedAt, &r.Source, &itemsJSON)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -103,6 +95,5 @@ func (s *Store) Get(date string) (*MenuRecord, error) {
 	if err := json.Unmarshal([]byte(itemsJSON), &r.Items); err != nil {
 		return nil, fmt.Errorf("parsing items JSON: %w", err)
 	}
-	r.Changed = changed == 1
 	return &r, nil
 }

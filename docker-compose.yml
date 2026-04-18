@@ -2,8 +2,6 @@ services:
   bot:
     build: .
     restart: unless-stopped
-    environment:
-      - SLACK_WEBHOOK_URL
     volumes:
       - type: bind
         source: ./data/
@@ -13,4 +11,5 @@ services:
         target: /app/config.yaml
         read_only: true
     ports:
-      - "9090:9090"
+      - "8080:8080"   # menu web page
+      - "9090:9090"   # Prometheus metrics

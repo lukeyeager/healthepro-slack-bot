@@ -20,9 +20,9 @@ func testMetrics(t *testing.T) *metrics.Metrics {
 		HealtheProRequests: promauto.With(reg).NewCounterVec(prometheus.CounterOpts{
 			Name: "healthepro_requests_total",
 		}, []string{"status_code"}),
-		SlackRequests: promauto.With(reg).NewCounterVec(prometheus.CounterOpts{
-			Name: "slack_requests_total",
-		}, []string{"status_code"}),
+		FetchFailures: promauto.With(reg).NewCounter(prometheus.CounterOpts{
+			Name: "menu_fetch_failures_total",
+		}),
 	}
 }
 

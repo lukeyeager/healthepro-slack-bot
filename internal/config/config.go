@@ -9,12 +9,13 @@ import (
 
 // Config holds static configuration loaded from config.yaml.
 type Config struct {
-	OrgID       int    `yaml:"org_id"`
-	MenuID      int    `yaml:"menu_id"`
-	EveningCron string `yaml:"evening_cron"`
-	MorningCron string `yaml:"morning_cron"`
-	DBPath      string `yaml:"db_path"`
-	Timezone    string `yaml:"timezone"`
+	OrgID     int    `yaml:"org_id"`
+	MenuID    int    `yaml:"menu_id"`
+	FetchCron string `yaml:"fetch_cron"`
+	DBPath    string `yaml:"db_path"`
+	Timezone  string `yaml:"timezone"`
+	HTTPAddr  string `yaml:"http_addr"`
+	MetricsAddr string `yaml:"metrics_addr"`
 }
 
 // Load reads and parses a YAML config file, applying defaults for optional fields.
@@ -25,10 +26,11 @@ func Load(path string) (*Config, error) {
 	}
 
 	cfg := &Config{
-		EveningCron: "0 19 * * 0-4",
-		MorningCron: "0 6 * * 1-5",
+		FetchCron:   "0 * * * *",
 		DBPath:      "/data/menus.db",
 		Timezone:    "America/Chicago",
+		HTTPAddr:    ":8080",
+		MetricsAddr: ":9090",
 	}
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return nil, fmt.Errorf("parsing config file: %w", err)
