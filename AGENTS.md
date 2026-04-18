@@ -121,3 +121,9 @@ Items in `current_display` have `type` of `"category"` or `"recipe"`.
 ## CI (GitHub Actions)
 
 On every push/PR: lint with `golangci-lint` and run `go test ./...`.
+
+## Privacy
+
+**Do not include real school names in docs or examples.** The README example session must use
+fictional/generic names (district, site, menu). Never reference specific school names, cities,
+states, grade bands (e.g. K-5), or real org/menu IDs in committed documentation.

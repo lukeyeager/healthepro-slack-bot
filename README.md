@@ -26,29 +26,28 @@ go run ./cmd/setup
 Example session:
 
 ```
-Search for your school district: diwa
+Search for your school district: lincoln
 
 Found 1 organization(s):
-  1) Diwa Kitchen (Texas)
+  1) Lincoln Unified (California)
 Pick an organization [1-1]: 1
 
-Sites for Diwa Kitchen (14):
-  1) Diwa Kitchen Irving Blvd
+Sites for Lincoln Unified (6):
+  1) Lincoln Elementary
   ...
-  12) Valor North Austin
+  4) Lincoln Middle School
   ...
-Pick a site [1-14]: 12
+Pick a site [1-6]: 1
 
-Menus for Valor North Austin (5):
-  1) 6-8 Lunch
-  ...
-  4) K-5 Lunch
-  ...
-Pick a menu [1-5]: 4
+Menus for Lincoln Elementary (3):
+  1) Breakfast
+  2) Elementary Lunch
+  3) Staff Lunch
+Pick a menu [1-3]: 2
 
 Wrote config.yaml
-  org_id:  1375  (Diwa Kitchen)
-  menu_id: 108888  (K-5 Lunch)
+  org_id:  1000  (Lincoln Unified)
+  menu_id: 20000  (Elementary Lunch)
 ```
 
 ### Static config (`config.yaml` — not checked into git)
